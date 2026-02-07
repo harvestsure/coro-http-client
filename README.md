@@ -13,6 +13,7 @@ A modern C++20 HTTP/HTTPS client library based on [ASIO](https://github.com/chri
 - ✅ **Compression** - Automatic gzip/deflate decompression
 - ✅ **Chunked Transfer** - Support for Transfer-Encoding: chunked
 - ✅ **SSL Verification** - Optional certificate verification with custom CA support
+- ✅ **Proxy Support** - HTTP/HTTPS/SOCKS5 proxies with authentication
 - ✅ **Header-Only** - Easy integration, no compilation required
 - ✅ **Custom Headers** - Flexible builder pattern for request customization
 - ✅ **Auto Dependency** - CMake FetchContent automatically downloads ASIO
@@ -146,6 +147,11 @@ config.verify_ssl = false;                        // Enable certificate verifica
 config.ca_cert_file = "/path/to/ca-bundle.crt";  // Custom CA certificate file
 config.ca_cert_path = "/path/to/certs/";         // Custom CA certificate directory
 
+// Proxy settings
+config.proxy_url = "http://proxy.example.com:8080";  // HTTP/HTTPS/SOCKS5 proxy
+config.proxy_username = "username";                   // Proxy authentication (optional)
+config.proxy_password = "password";                   // Proxy password (optional)
+
 // Create client with config
 coro_http::HttpClient client(config);
 
@@ -186,6 +192,53 @@ config.ca_cert_file = "/etc/ssl/certs/ca-certificates.crt";
 
 coro_http::HttpClient client(config);
 auto response = client.get("https://example.com");
+```
+
+#### Proxy Support
+
+The library supports HTTP, HTTPS, and SOCKS5 proxies with optional authentication:
+
+```cpp
+coro_http::ClientConfig config;
+
+// HTTP proxy (standard proxy for HTTP requests)
+config.proxy_url = "http://proxy.example.com:8080";
+
+// SOCKS5 proxy (works with both HTTP and HTTPS)
+config.proxy_url = "socks5://127.0.0.1:1080";
+
+// Proxy with authentication
+config.proxy_url = "http://proxy.example.com:8080";
+config.proxy_username = "user";
+config.proxy_password = "password";
+
+coro_http::HttpClient client(config);
+
+// For HTTP requests, proxy forwards the request
+auto http_resp = client.get("http://example.com");
+
+// For HTTPS requests, proxy uses HTTP CONNECT tunneling
+auto https_resp = client.get("https://example.com");
+```
+
+**Supported Proxy Types:**
+- **HTTP Proxy** (`http://...`): Standard HTTP proxy for HTTP requests, CONNECT tunneling for HTTPS
+- **HTTPS Proxy** (`https://...`): Same as HTTP proxy but with TLS connection to proxy server
+- **SOCKS5 Proxy** (`socks5://...`): SOCKS5 protocol for both HTTP and HTTPS with optional username/password authentication
+
+```cpp
+// Complete proxy example
+coro_http::ClientConfig config;
+config.proxy_url = "socks5://proxy.example.com:1080";
+config.proxy_username = "myuser";
+config.proxy_password = "mypass";
+config.verify_ssl = true;
+
+coro_http::CoroHttpClient client(config);
+client.run([&]() -> asio::awaitable<void> {
+    auto response = co_await client.co_get("https://api.ipify.org?format=json");
+    std::cout << "My IP through proxy: " << response.body() << "\n";
+});
 ```
 
 #### Timeout Handling
@@ -294,6 +347,7 @@ See the [examples](examples/) directory for complete working examples:
 - [coro_example.cpp](examples/coro_example.cpp) - Coroutine API usage with all methods
 - [https_example.cpp](examples/https_example.cpp) - HTTPS requests demonstration
 - [advanced_example.cpp](examples/advanced_example.cpp) - Advanced features (compression, redirects, timeouts, custom headers)
+- [proxy_example.cpp](examples/proxy_example.cpp) - Proxy support (HTTP/HTTPS/SOCKS5) with authentication
 
 ## Building Examples
 
@@ -307,6 +361,7 @@ make
 ./example_coro
 ./example_https
 ./example_advanced
+./example_proxy
 ```
 
 ## Troubleshooting

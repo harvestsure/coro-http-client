@@ -18,6 +18,10 @@ struct ClientConfig {
     bool verify_ssl{false};
     std::string ca_cert_file;
     std::string ca_cert_path;
+    
+    std::string proxy_url;
+    std::string proxy_username;
+    std::string proxy_password;
 };
 
 }

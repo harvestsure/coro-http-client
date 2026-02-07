@@ -5,12 +5,14 @@
 #include "url_parser.hpp"
 #include "http_parser.hpp"
 #include "client_config.hpp"
+#include "proxy_handler.hpp"
 #include <asio.hpp>
 #include <asio/ssl.hpp>
 #include <asio/co_spawn.hpp>
 #include <asio/detached.hpp>
 #include <asio/use_awaitable.hpp>
 #include <asio/steady_timer.hpp>
+#include <sstream>
 
 namespace coro_http {
 
@@ -21,7 +23,8 @@ public:
     explicit CoroHttpClient(const ClientConfig& config)
         : io_context_(), 
           ssl_context_(asio::ssl::context::tlsv12_client),
-          config_(config) {
+          config_(config),
+          proxy_info_(parse_proxy_url(config.proxy_url)) {
         ssl_context_.set_default_verify_paths();
         
         if (config_.verify_ssl) {
@@ -34,6 +37,11 @@ public:
             }
         } else {
             ssl_context_.set_verify_mode(asio::ssl::verify_none);
+        }
+        
+        if (!config_.proxy_username.empty()) {
+            proxy_info_.username = config_.proxy_username;
+            proxy_info_.password = config_.proxy_password;
         }
     }
 
@@ -83,39 +91,35 @@ private:
     }
 
     asio::awaitable<HttpResponse> co_execute_http(const HttpRequest& request, const UrlInfo& url_info) {
-        asio::ip::tcp::resolver resolver(io_context_);
-        auto endpoints = co_await resolver.async_resolve(
-            url_info.host, 
-            url_info.port, 
-            asio::use_awaitable
-        );
-        
         asio::ip::tcp::socket socket(io_context_);
-        co_await asio::async_connect(socket, endpoints, asio::use_awaitable);
+        co_await co_connect_socket(socket, url_info);
         
-        std::string request_str = build_request(request, url_info, config_.enable_compression);
+        std::string request_str;
+        if (proxy_info_.type == ProxyType::HTTP) {
+            request_str = build_proxy_request(request, url_info, config_.enable_compression);
+        } else {
+            request_str = build_request(request, url_info, config_.enable_compression);
+        }
+        
         co_await asio::async_write(socket, asio::buffer(request_str), asio::use_awaitable);
-        
         std::string response_data = co_await co_read_response(socket);
         
         co_return parse_response(response_data);
     }
 
     asio::awaitable<HttpResponse> co_execute_https(const HttpRequest& request, const UrlInfo& url_info) {
-        asio::ip::tcp::resolver resolver(io_context_);
-        auto endpoints = co_await resolver.async_resolve(
-            url_info.host, 
-            url_info.port, 
-            asio::use_awaitable
-        );
-        
         asio::ssl::stream<asio::ip::tcp::socket> ssl_socket(io_context_, ssl_context_);
+        
+        co_await co_connect_socket(ssl_socket.next_layer(), url_info);
+        
+        if (proxy_info_.type != ProxyType::NONE) {
+            co_await co_establish_tunnel(ssl_socket.next_layer(), url_info);
+        }
         
         if (config_.verify_ssl) {
             SSL_set_tlsext_host_name(ssl_socket.native_handle(), url_info.host.c_str());
         }
         
-        co_await asio::async_connect(ssl_socket.next_layer(), endpoints, asio::use_awaitable);
         co_await ssl_socket.async_handshake(asio::ssl::stream_base::client, asio::use_awaitable);
         
         std::string request_str = build_request(request, url_info, config_.enable_compression);
@@ -124,6 +128,132 @@ private:
         std::string response_data = co_await co_read_response(ssl_socket);
         
         co_return parse_response(response_data);
+    }
+
+    asio::awaitable<void> co_connect_socket(asio::ip::tcp::socket& socket, const UrlInfo& url_info) {
+        asio::ip::tcp::resolver resolver(io_context_);
+        
+        std::string connect_host;
+        std::string connect_port;
+        
+        if (proxy_info_.type != ProxyType::NONE) {
+            connect_host = proxy_info_.host;
+            connect_port = proxy_info_.port;
+        } else {
+            connect_host = url_info.host;
+            connect_port = url_info.port;
+        }
+        
+        auto endpoints = co_await resolver.async_resolve(
+            connect_host, 
+            connect_port, 
+            asio::use_awaitable
+        );
+        
+        co_await asio::async_connect(socket, endpoints, asio::use_awaitable);
+        
+        if (proxy_info_.type == ProxyType::SOCKS5) {
+            co_await co_perform_socks5_handshake(socket, url_info);
+        }
+    }
+
+    asio::awaitable<void> co_establish_tunnel(asio::ip::tcp::socket& socket, const UrlInfo& url_info) {
+        std::string connect_req = build_connect_request(
+            url_info.host, url_info.port,
+            proxy_info_.username, proxy_info_.password
+        );
+        
+        co_await asio::async_write(socket, asio::buffer(connect_req), asio::use_awaitable);
+        
+        std::array<char, 8192> buffer;
+        auto [ec, len] = co_await socket.async_read_some(
+            asio::buffer(buffer),
+            asio::as_tuple(asio::use_awaitable)
+        );
+        
+        if (ec && ec != asio::error::eof) {
+            throw std::system_error(ec);
+        }
+        
+        std::string response(buffer.data(), len);
+        if (!parse_connect_response(response)) {
+            throw std::runtime_error("Proxy CONNECT failed");
+        }
+    }
+
+    asio::awaitable<void> co_perform_socks5_handshake(asio::ip::tcp::socket& socket, const UrlInfo& url_info) {
+        bool use_auth = !proxy_info_.username.empty();
+        std::string handshake = build_socks5_handshake(use_auth);
+        co_await asio::async_write(socket, asio::buffer(handshake), asio::use_awaitable);
+        
+        std::array<char, 2> response1;
+        co_await asio::async_read(socket, asio::buffer(response1), asio::use_awaitable);
+        
+        if (response1[0] != 0x05) {
+            throw std::runtime_error("Invalid SOCKS5 response");
+        }
+        
+        if (response1[1] == 0x02) {
+            std::string auth = build_socks5_auth(proxy_info_.username, proxy_info_.password);
+            co_await asio::async_write(socket, asio::buffer(auth), asio::use_awaitable);
+            
+            std::array<char, 2> auth_response;
+            co_await asio::async_read(socket, asio::buffer(auth_response), asio::use_awaitable);
+            
+            if (auth_response[1] != 0x00) {
+                throw std::runtime_error("SOCKS5 authentication failed");
+            }
+        } else if (response1[1] != 0x00) {
+            throw std::runtime_error("SOCKS5 method not accepted");
+        }
+        
+        std::string connect_req = build_socks5_connect(url_info.host, url_info.port);
+        co_await asio::async_write(socket, asio::buffer(connect_req), asio::use_awaitable);
+        
+        std::array<char, 10> connect_response;
+        co_await asio::async_read(socket, asio::buffer(connect_response), asio::use_awaitable);
+        
+        if (connect_response[1] != 0x00) {
+            throw std::runtime_error("SOCKS5 connection failed");
+        }
+    }
+
+    std::string build_proxy_request(const HttpRequest& request, const UrlInfo& url_info, bool enable_compression) {
+        std::ostringstream req;
+        
+        std::string full_url = url_info.scheme + "://" + url_info.host;
+        if (url_info.port != (url_info.is_https ? "443" : "80")) {
+            full_url += ":" + url_info.port;
+        }
+        full_url += url_info.path;
+        
+        req << method_to_string(request.method()) << " " << full_url << " HTTP/1.1\r\n";
+        req << "Host: " << url_info.host << "\r\n";
+        
+        bool has_accept_encoding = false;
+        for (const auto& [key, value] : request.headers()) {
+            req << key << ": " << value << "\r\n";
+            if (strcasecmp_parser(key, "Accept-Encoding")) {
+                has_accept_encoding = true;
+            }
+        }
+        
+        if (enable_compression && !has_accept_encoding) {
+            req << "Accept-Encoding: gzip, deflate\r\n";
+        }
+        
+        if (!request.body().empty()) {
+            req << "Content-Length: " << request.body().size() << "\r\n";
+        }
+        
+        req << "Connection: close\r\n";
+        req << "\r\n";
+        
+        if (!request.body().empty()) {
+            req << request.body();
+        }
+        
+        return req.str();
     }
 
     template<typename AsyncReadStream>
@@ -199,6 +329,7 @@ private:
     asio::io_context io_context_;
     asio::ssl::context ssl_context_;
     ClientConfig config_;
+    ProxyInfo proxy_info_;
 };
 
 }
