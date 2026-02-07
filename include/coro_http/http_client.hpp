@@ -97,9 +97,11 @@ private:
         // Apply rate limiting
         rate_limiter_.acquire();
         
-        if (config_.enable_connection_pool && proxy_info_.type == ProxyType::NONE) {
-            return execute_http_pooled(request, url_info);
-        }
+        // TODO: Connection pooling needs improvement (proper Connection header handling, validation)
+        // Temporarily disabled to avoid hangs with servers that send Connection: close
+        // if (config_.enable_connection_pool && proxy_info_.type == ProxyType::NONE) {
+        //     return execute_http_pooled(request, url_info);
+        // }
         
         // Non-pooled connection for proxy requests
         asio::ip::tcp::socket socket(io_context_);
@@ -134,10 +136,21 @@ private:
             asio::write(*socket, asio::buffer(request_str));
             std::string response_data = read_with_timeout(*socket);
             
-            // Return connection to pool
-            connection_pool_.release_connection(socket, url_info.host, url_info.port);
+            auto response = parse_response(response_data);
             
-            return parse_response(response_data);
+            // Check if server wants to close connection
+            std::string connection_header = response.get_header("Connection");
+            bool should_keep_alive = (connection_header != "close");
+            
+            if (should_keep_alive) {
+                // Return connection to pool
+                connection_pool_.release_connection(socket, url_info.host, url_info.port);
+            } else {
+                // Server wants to close, don't return to pool
+                socket->close();
+            }
+            
+            return response;
         } catch (...) {
             // Don't return broken connection to pool
             socket->close();
@@ -149,9 +162,11 @@ private:
         // Apply rate limiting
         rate_limiter_.acquire();
         
-        if (config_.enable_connection_pool && proxy_info_.type == ProxyType::NONE) {
-            return execute_https_pooled(request, url_info);
-        }
+        // TODO: SSL connection pooling needs improvement (session reuse, proper close detection)
+        // Temporarily disabled for HTTPS to avoid hangs
+        // if (config_.enable_connection_pool && proxy_info_.type == ProxyType::NONE) {
+        //     return execute_https_pooled(request, url_info);
+        // }
         
         // Non-pooled connection for proxy requests
         asio::ssl::stream<asio::ip::tcp::socket> ssl_socket(io_context_, ssl_context_);
@@ -199,10 +214,21 @@ private:
             asio::write(*ssl_stream, asio::buffer(request_str));
             std::string response_data = read_with_timeout(*ssl_stream);
             
-            // Return connection to pool
-            connection_pool_.release_ssl_connection(ssl_stream, url_info.host, url_info.port);
+            auto response = parse_response(response_data);
             
-            return parse_response(response_data);
+            // Check if server wants to close connection
+            std::string connection_header = response.get_header("Connection");
+            bool should_keep_alive = (connection_header != "close");
+            
+            if (should_keep_alive) {
+                // Return connection to pool
+                connection_pool_.release_ssl_connection(ssl_stream, url_info.host, url_info.port);
+            } else {
+                // Server wants to close, don't return to pool
+                ssl_stream->lowest_layer().close();
+            }
+            
+            return response;
         } catch (...) {
             // Don't return broken connection to pool
             ssl_stream->lowest_layer().close();

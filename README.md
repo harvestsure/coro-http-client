@@ -273,38 +273,27 @@ client.run([&]() -> asio::awaitable<void> {
 
 #### Connection Pool & Keep-Alive
 
-The library automatically reuses TCP/TLS connections for better performance. This is especially important for:
-- **High-frequency trading APIs** (Binance, OKX, etc.)
-- **Repeated requests** to the same server
-- **REST API polling**
+> **⚠️ Note**: Connection pooling is currently **disabled by default** due to compatibility issues with some servers that don't properly support keep-alive. This feature is under active development and will be re-enabled once stability issues are resolved.
+
+The library has experimental connection pool support for better performance:
 
 ```cpp
 coro_http::ClientConfig config;
-config.enable_connection_pool = true;         // Default: true
-config.max_connections_per_host = 5;          // Max 5 connections per host
-config.connection_idle_timeout = std::chrono::seconds(60);  // Keep connections for 60s
+config.enable_connection_pool = true;         // Enable at your own risk
+config.max_connections_per_host = 5;
+config.connection_idle_timeout = std::chrono::seconds(60);
 
 coro_http::HttpClient client(config);
-
-// First request: establishes connection  (~300ms with TLS handshake)
-auto resp1 = client.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
-
-// Subsequent requests: reuse connection (~50ms, 6x faster!)
-auto resp2 = client.get("https://api.binance.com/api/v3/account");
-auto resp3 = client.get("https://api.binance.com/api/v3/openOrders");
-
-// Check pool statistics
-auto stats = client.get_pool_stats();
-std::cout << "Active connections: " << stats.total_http_connections << "\n";
-
-// Clear pool if needed
-client.clear_connection_pool();
 ```
 
-**Performance Impact:**
-- Without connection pool: Each request = DNS + TCP handshake + TLS handshake + HTTP (~300ms)
-- With connection pool: First request ~300ms, subsequent requests ~50ms
-- **Up to 6x faster for repeated requests!**
+**Why disabled?**
+- Some servers send `Connection: close` but pooling logic doesn't handle it properly
+- SSL session reuse needs improvement
+- Can cause hangs with certain server configurations
+
+**Workaround**: Each request creates a new connection (current default). This is slower but more reliable.
+
+**For high-performance scenarios**: Test connection pooling with your specific API endpoints before production use.
 
 #### Rate Limiting
 
@@ -509,20 +498,28 @@ config.ca_cert_file = "/etc/ssl/certs/ca-certificates.crt";
 - **Synchronous API**: Best for simple scripts, CLI tools, or when making sequential requests
 - **Coroutine API**: Best for servers, high-throughput applications, or when making many concurrent requests
 
-### Connection Pooling (Enabled by Default)
+### Connection Pooling (Experimental, Disabled by Default)
 
-The library automatically reuses connections for better performance:
+Connection pooling is implemented but currently disabled due to stability issues:
 
-- **First request**: DNS + TCP + TLS handshake + HTTP ≈ 300ms
-- **Subsequent requests**: HTTP only ≈ 50ms (6x faster!)
-- **Configurable**: `config.enable_connection_pool`, `config.max_connections_per_host`
+- **Status**: Implemented but needs fixes for proper Connection header handling
+- **Issue**: Some servers don't support keep-alive properly, causing hangs
+- **Workaround**: Each request creates a new connection (current default)
+
+**Enable at your own risk:**
+```cpp
+config.enable_connection_pool = true;  // Test thoroughly before production!
+```
 
 **Best for:**
-- Trading bots and exchange APIs
-- Repeated API polling
-- Microservice communication
+- APIs that explicitly support keep-alive
+- Internal services with known behavior
+- After thorough testing with your endpoints
 
-**Disable if:** You need fresh connections for every request (rare)
+**Avoid for:**
+- Public APIs with unknown behavior
+- Production without testing
+- Critical applications requiring 100% reliability
 
 ### Rate Limiting
 
@@ -542,8 +539,10 @@ The library buffers entire responses in memory. For very large responses (e.g., 
 
 Future enhancements under consideration:
 
-- ✅ Connection pooling and Keep-Alive support
+- 🚧 Connection pooling and Keep-Alive support (implemented but needs stability fixes)
 - ✅ Rate limiting
+- Proper Connection header handling for keep-alive
+- SSL session reuse and validation
 - Streaming downloads/uploads  
 - HTTP/2 support
 - WebSocket upgrade
