@@ -140,20 +140,26 @@ private:
             
             // Check if server wants to close connection
             std::string connection_header = response.get_header("Connection");
+            std::transform(connection_header.begin(), connection_header.end(), 
+                         connection_header.begin(), ::tolower);
             bool should_keep_alive = (connection_header != "close");
             
-            if (should_keep_alive) {
-                // Return connection to pool
-                connection_pool_.release_connection(socket, url_info.host, url_info.port);
-            } else {
-                // Server wants to close, don't return to pool
-                socket->close();
+            // Return connection to pool only if keep-alive
+            connection_pool_.release_connection(socket, url_info.host, url_info.port, should_keep_alive);
+            
+            // Close socket if server requested close
+            if (!should_keep_alive) {
+                asio::error_code ec;
+                socket->shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+                socket->close(ec);
             }
             
             return response;
         } catch (...) {
             // Don't return broken connection to pool
-            socket->close();
+            asio::error_code ec;
+            socket->shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+            socket->close(ec);
             throw;
         }
     }
@@ -218,20 +224,25 @@ private:
             
             // Check if server wants to close connection
             std::string connection_header = response.get_header("Connection");
+            std::transform(connection_header.begin(), connection_header.end(), 
+                         connection_header.begin(), ::tolower);
             bool should_keep_alive = (connection_header != "close");
             
-            if (should_keep_alive) {
-                // Return connection to pool
-                connection_pool_.release_ssl_connection(ssl_stream, url_info.host, url_info.port);
-            } else {
-                // Server wants to close, don't return to pool
-                ssl_stream->lowest_layer().close();
+            // Return connection to pool only if keep-alive
+            connection_pool_.release_ssl_connection(ssl_stream, url_info.host, url_info.port, should_keep_alive);
+            
+            // Close SSL connection if server requested close
+            if (!should_keep_alive) {
+                asio::error_code ec;
+                ssl_stream->shutdown(ec);  // Graceful SSL shutdown
+                ssl_stream->lowest_layer().close(ec);
             }
             
             return response;
         } catch (...) {
             // Don't return broken connection to pool
-            ssl_stream->lowest_layer().close();
+            asio::error_code ec;
+            ssl_stream->lowest_layer().close(ec);
             throw;
         }
     }

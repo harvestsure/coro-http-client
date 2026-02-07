@@ -23,8 +23,7 @@ struct ClientConfig {
     std::string proxy_username;
     std::string proxy_password;
     
-    // Connection pool settings (currently disabled by default, experimental)
-    bool enable_connection_pool{false};
+    bool enable_connection_pool{true};
     int max_connections_per_host{5};
     std::chrono::seconds connection_idle_timeout{60};
     

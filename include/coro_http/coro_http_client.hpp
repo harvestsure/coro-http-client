@@ -137,13 +137,31 @@ private:
             co_await asio::async_write(*socket, asio::buffer(request_str), asio::use_awaitable);
             std::string response_data = co_await co_read_response(*socket);
             
-            // Return connection to pool
-            connection_pool_.release_connection(socket, url_info.host, url_info.port);
+            // Parse response and check Connection header
+            auto response = parse_response(response_data);
             
-            co_return parse_response(response_data);
+            // Check if server wants to close the connection
+            std::string connection_header = response.get_header("Connection");
+            std::transform(connection_header.begin(), connection_header.end(), 
+                         connection_header.begin(), ::tolower);
+            bool should_keep_alive = (connection_header != "close");
+            
+            // Return connection to pool only if keep-alive
+            connection_pool_.release_connection(socket, url_info.host, url_info.port, should_keep_alive);
+            
+            // Close socket if server requested close
+            if (!should_keep_alive) {
+                asio::error_code ec;
+                socket->shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+                socket->close(ec);
+            }
+            
+            co_return response;
         } catch (...) {
             // Don't return broken connection to pool
-            socket->close();
+            asio::error_code ec;
+            socket->shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+            socket->close(ec);
             throw;
         }
     }
@@ -203,13 +221,30 @@ private:
             co_await asio::async_write(*ssl_stream, asio::buffer(request_str), asio::use_awaitable);
             std::string response_data = co_await co_read_response(*ssl_stream);
             
-            // Return connection to pool
-            connection_pool_.release_ssl_connection(ssl_stream, url_info.host, url_info.port);
+            // Parse response and check Connection header
+            auto response = parse_response(response_data);
             
-            co_return parse_response(response_data);
+            // Check if server wants to close the connection
+            std::string connection_header = response.get_header("Connection");
+            std::transform(connection_header.begin(), connection_header.end(), 
+                         connection_header.begin(), ::tolower);
+            bool should_keep_alive = (connection_header != "close");
+            
+            // Return connection to pool only if keep-alive
+            connection_pool_.release_ssl_connection(ssl_stream, url_info.host, url_info.port, should_keep_alive);
+            
+            // Close SSL connection if server requested close
+            if (!should_keep_alive) {
+                asio::error_code ec;
+                co_await ssl_stream->async_shutdown(asio::use_awaitable);
+                ssl_stream->lowest_layer().close(ec);
+            }
+            
+            co_return response;
         } catch (...) {
             // Don't return broken connection to pool
-            ssl_stream->lowest_layer().close();
+            asio::error_code ec;
+            ssl_stream->lowest_layer().close(ec);
             throw;
         }
     }

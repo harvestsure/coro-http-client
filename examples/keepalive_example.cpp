@@ -226,13 +226,13 @@ int main() {
     
     // Uncomment the demos you want to run:
     
-    // sync_connection_pool_demo();
-    // sync_rate_limiter_demo();
+    sync_connection_pool_demo();
+    sync_rate_limiter_demo();
     
-    // async_connection_pool_demo();
-    // async_rate_limiter_demo();
+    async_connection_pool_demo();
+    async_rate_limiter_demo();
     
-    // trading_simulation_demo();
+    trading_simulation_demo();
     
     std::cout << "All demos are commented out by default.\n";
     std::cout << "Uncomment the ones you want to test.\n";
