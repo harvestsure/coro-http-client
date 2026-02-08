@@ -6,8 +6,8 @@
   "homepage": "https://github.com/harvestsure/coro-http",
   "documentation": "https://github.com/harvestsure/coro-http#readme",
   "license": "MIT",
-  "authors": "Harvest Sure",
   "maintainers": "Harvest Sure <harvestsure@gmail.com>",
+  "supports": "linux | macos | windows",
   "dependencies": [
     {
       "name": "asio",
@@ -21,18 +21,5 @@
       "name": "zlib",
       "version>=": "1.2.11"
     }
-  ],
-  "keywords": [
-    "http",
-    "https",
-    "client",
-    "http-client",
-    "async",
-    "coroutines",
-    "c++20",
-    "asio",
-    "ssl",
-    "tls",
-    "sse"
   ]
 }
