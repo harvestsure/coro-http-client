@@ -1,5 +1,9 @@
 # coro_http
 
+[![windows](https://github.com/harvestsure/coro-http/actions/workflows/windows.yml/badge.svg)](https://github.com/harvestsure/coro-http/actions/workflows/windows.yml)
+[![ubuntu](https://github.com/harvestsure/coro-http/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/harvestsure/coro-http/actions/workflows/ubuntu.yml)
+[![macos](https://github.com/harvestsure/coro-http/actions/workflows/macos.yml/badge.svg)](https://github.com/harvestsure/coro-http/actions/workflows/macos.yml)
+
 A modern C++20 HTTP/HTTPS client library with coroutine-based async/await API.
 
 ## Features
