@@ -9,17 +9,8 @@
   "maintainers": "Harvest Sure <harvestsure@gmail.com>",
   "supports": "linux | macos | windows",
   "dependencies": [
-    {
-      "name": "asio",
-      "version>=": "1.30.2"
-    },
-    {
-      "name": "openssl",
-      "version>=": "3.0.0"
-    },
-    {
-      "name": "zlib",
-      "version>=": "1.2.11"
-    }
+    "asio",
+    "openssl",
+    "zlib"
   ]
 }
