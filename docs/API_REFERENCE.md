@@ -1,58 +1,5 @@
 # API Reference
 
-## Synchronous API (HttpClient)
-
-### Basic Methods
-
-```cpp
-asio::io_context io_ctx;
-coro_http::HttpClient client(io_ctx);
-
-// GET request
-auto response = client.get(const std::string& url);
-auto response = client.get(const HttpRequest& request);
-
-// POST request
-auto response = client.post(const std::string& url, const std::string& body);
-auto response = client.post(const HttpRequest& request);
-
-// PUT request
-auto response = client.put(const std::string& url, const std::string& body);
-
-// DELETE request
-auto response = client.delete_(const std::string& url);
-
-// HEAD request
-auto response = client.head(const std::string& url);
-
-// PATCH request
-auto response = client.patch(const std::string& url, const std::string& body);
-```
-
-### SSE Streaming
-
-```cpp
-// Stream Server-Sent Events
-client.stream_events(
-    const HttpRequest& request,
-    std::function<void(const SseEvent&)> callback
-);
-
-// HTTP variant
-client.stream_events_http(
-    const HttpRequest& request,
-    const UrlInfo& url_info,
-    std::function<void(const SseEvent&)> callback
-);
-
-// HTTPS variant
-client.stream_events_https(
-    const HttpRequest& request,
-    const UrlInfo& url_info,
-    std::function<void(const SseEvent&)> callback
-);
-```
-
 ## Coroutine API (CoroHttpClient)
 
 ### Basic Methods
@@ -61,7 +8,7 @@ client.stream_events_https(
 asio::io_context io_ctx;
 coro_http::CoroHttpClient client(io_ctx);
 
-client.run([]() -> asio::awaitable<void> {
+client.run([&]() -> asio::awaitable<void> {
     // GET request
     auto response = co_await client.co_get(const std::string& url);
     auto response = co_await client.co_get(const HttpRequest& request);

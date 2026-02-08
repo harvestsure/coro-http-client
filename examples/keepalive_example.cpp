@@ -1,86 +1,9 @@
 #include <iostream>
 #include <chrono>
 #include <asio.hpp>
-#include "coro_http/http_client.hpp"
 #include "coro_http/coro_http_client.hpp"
 
 using namespace coro_http;
-
-void sync_connection_pool_demo() {
-    std::cout << "=== Synchronous Connection Pool Demo ===\n\n";
-    
-    asio::io_context io_ctx;
-    ClientConfig config;
-    config.enable_connection_pool = true;
-    config.max_connections_per_host = 3;
-    config.connection_idle_timeout = std::chrono::seconds(30);
-    
-    HttpClient client(io_ctx, config);
-    
-    // Make multiple requests to the same host
-    std::cout << "Making 5 requests to httpbin.org...\n";
-    auto start = std::chrono::steady_clock::now();
-    
-    for (int i = 0; i < 5; ++i) {
-        try {
-            auto response = client.get("http://httpbin.org/delay/1");
-            std::cout << "Request " << (i+1) << ": Status = " << response.status_code() << "\n";
-            
-            // Show connection pool stats
-            auto stats = client.get_pool_stats();
-            std::cout << "  Pool: " << stats.total_http_connections << " total, "
-                      << stats.active_http_connections << " active\n";
-        } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << "\n";
-        }
-    }
-    
-    auto end = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "\nTotal time: " << duration.count() << "ms\n";
-    std::cout << "Average per request: " << duration.count() / 5 << "ms\n\n";
-}
-
-void sync_rate_limiter_demo() {
-    std::cout << "=== Synchronous Rate Limiter Demo ===\n\n";
-    
-    asio::io_context io_ctx;
-    ClientConfig config;
-    config.enable_rate_limit = true;
-    config.rate_limit_requests = 3;  // 3 requests per second
-    config.rate_limit_window = std::chrono::seconds(1);
-    
-    HttpClient client(io_ctx, config);
-    
-    std::cout << "Rate limit: " << config.rate_limit_requests << " requests per second\n";
-    std::cout << "Making 6 requests (should take ~2 seconds)...\n\n";
-    
-    auto start = std::chrono::steady_clock::now();
-    
-    for (int i = 0; i < 6; ++i) {
-        auto request_start = std::chrono::steady_clock::now();
-        
-        std::cout << "Request " << (i+1) << " - Remaining capacity: " 
-                  << client.get_rate_limit_remaining() << " ";
-        
-        try {
-            auto response = client.get("http://httpbin.org/uuid");
-            
-            auto request_end = std::chrono::steady_clock::now();
-            auto request_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                request_end - request_start);
-            
-            std::cout << "- Done in " << request_duration.count() << "ms "
-                      << "(Status: " << response.status_code() << ")\n";
-        } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << "\n";
-        }
-    }
-    
-    auto end = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "\nTotal time: " << duration.count() << "ms\n\n";
-}
 
 void async_connection_pool_demo() {
     std::cout << "=== Asynchronous Connection Pool Demo ===\n\n";
@@ -231,9 +154,6 @@ int main() {
     std::cout << "3. Trading-like scenarios\n\n";
     
     // Uncomment the demos you want to run:
-    
-    sync_connection_pool_demo();
-    sync_rate_limiter_demo();
     
     async_connection_pool_demo();
     async_rate_limiter_demo();

@@ -47,5 +47,4 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 Makefile
-example_sync
 example_coro

@@ -12,78 +12,78 @@ int main() {
     config.connect_timeout = std::chrono::seconds(5);
     config.read_timeout = std::chrono::seconds(5);
     
-    // Example 1: Basic Auth
-    std::cout << "\n[1] Basic Auth" << std::endl;
-    try {
-        HttpClient client(io_ctx, config);
-        auto req = HttpRequest(HttpMethod::GET, "https://httpbin.org/basic-auth/user/passwd");
-        req.add_header("Authorization", Auth::basic("user", "passwd"));
-        auto resp = client.execute(req);
-        std::cout << "Status: " << resp.status_code() << std::endl;
-        std::cout << "Body: " << resp.body().substr(0, 100) << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
+    CoroHttpClient client(io_ctx, config);
     
-    // Example 2: Bearer Token
-    std::cout << "\n[2] Bearer Token" << std::endl;
-    try {
-        HttpClient client(io_ctx, config);
-        auto req = HttpRequest(HttpMethod::GET, "https://httpbin.org/bearer");
-        req.add_header("Authorization", Auth::bearer("test-token-123"));
-        auto resp = client.execute(req);
-        std::cout << "Status: " << resp.status_code() << std::endl;
-        std::cout << "Body: " << resp.body().substr(0, 100) << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
-    
-    // Example 3: Form Data POST
-    std::cout << "\n[3] Form Data POST" << std::endl;
-    try {
-        HttpClient client(io_ctx, config);
-        FormData form;
-        form.add("username", "john_doe")
-            .add("email", "john@example.com")
-            .add("message", "Hello World!");
-        
-        std::cout << "Encoded form: " << form.encode() << std::endl;
-        
-        auto req = HttpRequest(HttpMethod::POST, "https://httpbin.org/post");
-        req.add_header("Content-Type", FormData::content_type());
-        req.set_body(form.encode());
-        
-        auto resp = client.execute(req);
-        std::cout << "Status: " << resp.status_code() << std::endl;
-        std::cout << "Body (first 200 chars): " << resp.body().substr(0, 200) << "..." << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
-    
-    // Example 4: Cookies
-    std::cout << "\n[4] Cookies Management" << std::endl;
-    try {
-        ClientConfig cfg = config;
-        cfg.enable_cookies = true;
-        HttpClient client(io_ctx, cfg);
-        
-        // First request sets cookies
-        auto r1 = client.get("https://httpbin.org/cookies/set?session=abc123&user=john");
-        std::cout << "First request status: " << r1.status_code() << std::endl;
-        
-        // Show stored cookies
-        std::cout << "Stored cookies:" << std::endl;
-        for (const auto& c : client.cookies().all_cookies()) {
-            std::cout << "  " << c.name << " = " << c.value << std::endl;
+    client.run([&]() -> asio::awaitable<void> {
+        // Example 1: Basic Auth
+        std::cout << "\n[1] Basic Auth" << std::endl;
+        try {
+            auto req = HttpRequest(HttpMethod::GET, "https://httpbin.org/basic-auth/user/passwd");
+            req.add_header("Authorization", Auth::basic("user", "passwd"));
+            auto resp = co_await client.co_execute(req);
+            std::cout << "Status: " << resp.status_code() << std::endl;
+            std::cout << "Body: " << resp.body().substr(0, 100) << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
         }
         
-        // Second request should include cookies automatically
-        auto r2 = client.get("https://httpbin.org/cookies");
-        std::cout << "\nSecond request status: " << r2.status_code() << std::endl;
-        std::cout << "Response body: " << r2.body().substr(0, 150) << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
+        // Example 2: Bearer Token
+        std::cout << "\n[2] Bearer Token" << std::endl;
+        try {
+            auto req = HttpRequest(HttpMethod::GET, "https://httpbin.org/bearer");
+            req.add_header("Authorization", Auth::bearer("test-token-123"));
+            auto resp = co_await client.co_execute(req);
+            std::cout << "Status: " << resp.status_code() << std::endl;
+            std::cout << "Body: " << resp.body().substr(0, 100) << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+        }
+        
+        // Example 3: Form Data POST
+        std::cout << "\n[3] Form Data POST" << std::endl;
+        try {
+            FormData form;
+            form.add("username", "john_doe")
+                .add("email", "john@example.com")
+                .add("message", "Hello World!");
+            
+            std::cout << "Encoded form: " << form.encode() << std::endl;
+            
+            auto req = HttpRequest(HttpMethod::POST, "https://httpbin.org/post");
+            req.add_header("Content-Type", FormData::content_type());
+            req.set_body(form.encode());
+            
+            auto resp = co_await client.co_execute(req);
+            std::cout << "Status: " << resp.status_code() << std::endl;
+            std::cout << "Body (first 200 chars): " << resp.body().substr(0, 200) << "..." << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+        }
+        
+        // Example 4: Cookies
+        std::cout << "\n[4] Cookies Management" << std::endl;
+        try {
+            ClientConfig cfg = config;
+            cfg.enable_cookies = true;
+            
+            // First request sets cookies
+            auto r1 = co_await client.co_get("https://httpbin.org/cookies/set?session=abc123&user=john");
+            std::cout << "First request status: " << r1.status_code() << std::endl;
+            
+            // Show stored cookies
+            std::cout << "Stored cookies:" << std::endl;
+            for (const auto& c : client.cookies().all_cookies()) {
+                std::cout << "  " << c.name << " = " << c.value << std::endl;
+            }
+            
+            // Second request should include cookies automatically
+            auto r2 = co_await client.co_get("https://httpbin.org/cookies");
+            std::cout << "\nSecond request status: " << r2.status_code() << std::endl;
+            std::cout << "Response body: " << r2.body().substr(0, 150) << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+        }
+    });
     
     // Example 5: Auth Helpers Demo
     std::cout << "\n[5] Auth Helpers Demo" << std::endl;

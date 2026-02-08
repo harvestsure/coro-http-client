@@ -1,12 +1,11 @@
 # coro_http
 
-A modern C++20 HTTP/HTTPS client library with both coroutine and synchronous APIs.
+A modern C++20 HTTP/HTTPS client library with coroutine-based async/await API.
 
 ## Features
 
 - ✅ HTTP/HTTPS support with SSL/TLS
 - ✅ C++20 coroutines for async operations  
-- ✅ Synchronous API for simple use cases
 - ✅ Connection pooling with Keep-Alive
 - ✅ Automatic redirects and compression
 - ✅ Retry policies with exponential backoff
@@ -17,22 +16,6 @@ A modern C++20 HTTP/HTTPS client library with both coroutine and synchronous API
 
 ## Quick Start
 
-### Synchronous API
-
-```cpp
-#include <coro_http/coro_http.hpp>
-
-int main() {
-    asio::io_context io_ctx;
-    coro_http::HttpClient client(io_ctx);
-    
-    auto response = client.get("https://api.github.com/users/github");
-    std::cout << "Status: " << response.status_code() << "\n";
-    
-    return 0;
-}
-```
-
 ### Coroutine API
 
 ```cpp
@@ -42,7 +25,7 @@ int main() {
     asio::io_context io_ctx;
     coro_http::CoroHttpClient client(io_ctx);
     
-    client.run([]() -> asio::awaitable<void> {
+    client.run([&]() -> asio::awaitable<void> {
         auto response = co_await client.co_get("https://api.github.com/users/github");
         std::cout << "Status: " << response.status_code() << "\n";
     });

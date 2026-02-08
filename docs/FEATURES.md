@@ -20,9 +20,9 @@
 
 ## API Styles
 
-- ✅ Synchronous blocking API (HttpClient)
 - ✅ C++20 Coroutine async/await (CoroHttpClient)
-- ✅ Both operate on same underlying pool
+- ✅ Modern async/await patterns
+- ✅ Non-blocking operations
 
 ## Performance Features
 
@@ -56,7 +56,7 @@
 - ✅ Multi-line data field support
 - ✅ Custom event types
 - ✅ Event IDs and retry timing
-- ✅ Both sync and async APIs
+- ✅ Async API
 - ✅ Automatic reconnection support
 
 ## Development

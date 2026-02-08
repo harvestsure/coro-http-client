@@ -26,9 +26,6 @@ target_include_directories(coro_http INTERFACE
 target_compile_definitions(coro_http INTERFACE ASIO_STANDALONE)
 target_link_libraries(coro_http INTERFACE OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
 
-add_executable(example_sync examples/sync_example.cpp)
-target_link_libraries(example_sync PRIVATE coro_http)
-
 add_executable(example_coro examples/coro_example.cpp)
 target_link_libraries(example_coro PRIVATE coro_http)
 
@@ -52,8 +49,6 @@ target_link_libraries(example_auth_features PRIVATE coro_http)
 
 add_executable(example_auth_local examples/auth_features_local_test.cpp)
 target_link_libraries(example_auth_local PRIVATE coro_http)
-add_executable(example_sse_sync examples/sse_sync_example.cpp)
-target_link_libraries(example_sse_sync PRIVATE coro_http)
 
 add_executable(example_sse_coro examples/sse_coro_example.cpp)
 target_link_libraries(example_sse_coro PRIVATE coro_http)
