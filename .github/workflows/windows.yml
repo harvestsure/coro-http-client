@@ -16,30 +16,57 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup CMake and Ninja
-      uses: lukka/get-cmake@latest
+    - name: Cache vcpkg
+      uses: actions/cache@v4
       with:
-        useClang: false
+        path: C:/vcpkg
+        key: vcpkg-${{ runner.os }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json') }}
+        restore-keys: |
+          vcpkg-${{ runner.os }}-${{ env.VCPKG_COMMIT_ID }}-
+          vcpkg-${{ runner.os }}-
     
-    - name: Restore vcpkg and build
-      uses: lukka/run-vcpkg@v11
-      id: runvcpkg
-      with:
-        vcpkgGitCommitId: '${{ env.VCPKG_COMMIT_ID }}'
-        vcpkgJsonGlob: '**/vcpkg.json'
-        runVcpkgInstall: true
+    - name: Install vcpkg
+      shell: bash
+      run: |
+        if [ ! -d "C:/vcpkg" ]; then
+          echo "Installing vcpkg..."
+          git clone https://github.com/microsoft/vcpkg.git C:/vcpkg
+          cd C:/vcpkg
+          git checkout ${{ env.VCPKG_COMMIT_ID }}
+          cmd.exe /c bootstrap-vcpkg.bat
+        else
+          echo "vcpkg already installed"
+        fi
     
-    - name: Build and Test with CMake
-      uses: lukka/run-cmake@v10
-      with:
-        cmakeListsOrSettingsJson: CMakeListsTxtBasic
-        cmakeListsTxtPath: '${{ github.workspace }}/CMakeLists.txt'
-        useVcpkgToolchain: true
-        vcpkgRoot: '${{ steps.runvcpkg.outputs.VCPKG_ROOT }}'
-        buildDirectory: '${{ github.workspace }}/build'
-        configureArgs: '-G "Visual Studio 17 2022" -DBUILD_TESTS=ON -DENABLE_SANITIZER=OFF -DCMAKE_POLICY_DEFAULT_CMP0174=NEW'
-        buildArgs: '--config Release --parallel 4'
-        testArgs: '--output-on-failure --timeout 30 -C Release'
+    - name: Install dependencies
+      shell: bash
+      run: |
+        C:/vcpkg/vcpkg.exe install \
+          --triplet x64-windows \
+          --x-manifest-root=${{ github.workspace }} \
+          --x-install-root=${{ github.workspace }}/vcpkg_installed
+    
+    - name: Configure CMake
+      shell: bash
+      run: |
+        cmake -B build -S . \
+          -G "Visual Studio 17 2022" \
+          -A x64 \
+          -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake \
+          -DBUILD_TESTS=ON \
+          -DENABLE_SANITIZER=OFF \
+          -DCMAKE_POLICY_DEFAULT_CMP0174=NEW
+    
+    - name: Build
+      shell: bash
+      run: |
+        cmake --build build --config Release --parallel 4
+    
+    - name: Run tests
+      shell: bash
+      run: |
+        cd build
+        ctest --output-on-failure --timeout 30 -C Release
 
     - name: Run example (coro)
       timeout-minutes: 2
