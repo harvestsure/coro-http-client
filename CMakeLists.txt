@@ -66,28 +66,28 @@ endif()
 install(DIRECTORY include/coro_http DESTINATION include)
 install(TARGETS coro_http EXPORT coro_httpTargets)
 install(EXPORT coro_httpTargets 
-        FILE coro_httpTargets.cmake
-        NAMESPACE coro_http::
-        DESTINATION lib/cmake/coro_http)
+  FILE coro_httpTargets.cmake
+  NAMESPACE coro_http::
+  DESTINATION lib/cmake/coro-http-client)
 
 # Install CMake config files
 include(CMakePackageConfigHelpers)
 configure_package_config_file(
-    cmake/coro_httpConfig.cmake.in
-    "${CMAKE_CURRENT_BINARY_DIR}/coro_httpConfig.cmake"
-    INSTALL_DESTINATION lib/cmake/coro_http
+  cmake/coro_httpConfig.cmake.in
+  "${CMAKE_CURRENT_BINARY_DIR}/coro-http-clientConfig.cmake"
+  INSTALL_DESTINATION lib/cmake/coro-http-client
 )
 
 write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/coro_httpConfigVersion.cmake"
-    VERSION 1.0.0
-    COMPATIBILITY SameMajorVersion
+  "${CMAKE_CURRENT_BINARY_DIR}/coro-http-clientConfigVersion.cmake"
+  VERSION 1.0.0
+  COMPATIBILITY SameMajorVersion
 )
 
 install(FILES 
-    "${CMAKE_CURRENT_BINARY_DIR}/coro_httpConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/coro_httpConfigVersion.cmake"
-    DESTINATION lib/cmake/coro_http
+  "${CMAKE_CURRENT_BINARY_DIR}/coro-http-clientConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/coro-http-clientConfigVersion.cmake"
+  DESTINATION lib/cmake/coro-http-client
 )
 
 add_executable(example_coro examples/coro_example.cpp)
