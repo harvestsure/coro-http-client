@@ -6,8 +6,7 @@ on:
   pull_request:
     branches: [ main, develop ]
 
-env:
-  VCPKG_COMMIT_ID: 4065f37d0a6628ef17cf6ee15385f9091f1075bc
+env: {}
 
 jobs:
   build-and-test:
@@ -25,14 +24,13 @@ jobs:
           vcpkg/installed
           vcpkg/buildtrees
           vcpkg/downloads
-        key: vcpkg-windows-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('**/vcpkg.json') }}
+        key: vcpkg-windows-${{ hashFiles('**/vcpkg.json') }}
         restore-keys: |
-          vcpkg-windows-${{ env.VCPKG_COMMIT_ID }}-
+          vcpkg-windows-
     
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgGitCommitId: '${{ env.VCPKG_COMMIT_ID }}'
         vcpkgJsonGlob: '**/vcpkg.json'
     
     - name: Setup CMake
