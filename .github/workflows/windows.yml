@@ -41,10 +41,8 @@ jobs:
     - name: Install dependencies
       shell: bash
       run: |
-        C:/vcpkg/vcpkg.exe install \
-          --triplet x64-windows \
-          --x-manifest-root=${{ github.workspace }} \
-          --x-install-root=${{ github.workspace }}/vcpkg_installed
+        cd "$GITHUB_WORKSPACE"
+        C:/vcpkg/vcpkg.exe install --triplet x64-windows
     
     - name: Configure CMake
       shell: bash
